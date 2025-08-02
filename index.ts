@@ -1,6 +1,8 @@
 import { env } from 'bun'
 import { Mwn } from 'mwn'
 
+import type { Heading } from './types'
+
 const bot = await Mwn.init({
     apiUrl: 'https://en.wiktionary.org/w/api.php',
 
@@ -29,14 +31,63 @@ const bot = await Mwn.init({
         m => m[1]!
       )
     )
-    .flatMap(l => l)
+    .flatMap(l => l),
+  summary = 'obastan ded🥀🕊️'
 
-lemmalist.forEach(async lemma => {
-  await bot
-    .edit(lemma, rev => ({
-      text: rev.content.replace('{{R:az:Obastan}}', '{{R:az:ADIL}}'),
-      summary: 'obastan ded🥀🕊️',
-      minor: true,
-    }))
+for (const lemma of lemmalist) {
+  bot
+    .request({
+      action: 'parse',
+      page: lemma,
+      prop: 'sections|wikitext',
+      format: 'json',
+    })
+    .then(async data => {
+      const headings: Array<Heading> = data.parse.sections,
+        { wikitext }: { wikitext: string } = data.parse,
+        L2s = headings.filter(h => h.level === '2'),
+        azL2 = L2s.findIndex(h => h.anchor === 'Azerbaijani')
+
+      if (azL2 === -1) return
+
+      // [lemma]#Azerbaijani isn't an orange link
+      const az = wikitext
+        .match(
+          new RegExp(
+            azL2 === L2s.length - 1
+              ? '(==Azerbaijani==.*)'
+              : `(==Azerbaijani==.*)==${L2s[azL2 + 1]?.anchor}==`,
+            's'
+          ) // i couldn't make it a single regex sorry😔😔
+        )![1]!
+        .trim()
+
+      if (!az.match(/\{\{r\:(az\:)?obastan\}\}/i)) return
+
+      // entry contains {{R:az:Obastan}} or {{R:Obastan}}
+
+      var text = wikitext,
+        references = az.match(/(====?References===.*?)(?====.*===|$)/s)?.[1]?.trim(),
+        furtherReading = az.match(
+          /(====?Further reading====.*?)(?===.*===|$)/s
+        )?.[1]?.trim()
+
+      if (furtherReading) {
+        if (!references) {
+          text = wikitext.replace(
+            furtherReading,
+            `${furtherReading.startsWith('====') ? '====' : '==='}References${
+              furtherReading.startsWith('====') ? '====' : '==='
+            }\n* {{R:az:ADIL}}`
+          )
+        }
+      }
+
+      await bot.edit(lemma, () => ({
+        text,
+        summary,
+        minor: true,
+      }))
+    })
     .catch(() => {})
-})
+}
