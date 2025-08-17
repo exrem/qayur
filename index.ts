@@ -69,7 +69,7 @@ for (const lemma of lemmalist) {
       var text = wikitext,
         references = az.match(/(====?References===.*?)(?====.*===|$)/s)?.[1]?.trim(),
         furtherReading = az.match(
-          /(====?Further reading====.*?)(?===.*===|$)/s
+          /(====?Further reading====?.*?)(?===.*===|$)/s
         )?.[1]?.trim()
 
       if (furtherReading) {
